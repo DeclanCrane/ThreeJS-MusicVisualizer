@@ -8,12 +8,19 @@ import {GlitchPass} from '/jsm/postprocessing/GlitchPass.js';
 
 let cube;
 
-// Audio Variables
+// Scene
+let scene, camera, renderer, controls;
+
+// Audio
 let listener, sound, audioLoader, audioAnalyser, arrayOfBars;
+
+// Stars Geometry
+let starFieldGeometry, posArray, starFieldMaterial, starFieldMesh;
 
 // Post Processing
 let composer;
 
+// Bloom Params
 const params = {
     exposure: 1,
     bloomStrength: 1.3,
@@ -41,7 +48,6 @@ function createAudio(){
     // create an AudioAnalyser, passing in the sound and desired fftSize
     audioAnalyser = new THREE.AudioAnalyser( sound, 128 );
 }
-
 function createBars(){
     const numberOfBars = audioAnalyser.analyser.frequencyBinCount;
     const colorOfBars = 0x0000ff;
@@ -68,40 +74,51 @@ function createBars(){
         scene.add( cube );
     }
 }
+function setupScene(){
+    scene = new THREE.Scene();
 
-const scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.z = 3.5;
+    
+    renderer = new THREE.WebGLRenderer( { antialias: true } );
+    renderer.setPixelRatio( window.devicePixelRatio );
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ReinhardToneMapping;
+    document.body.appendChild(renderer.domElement);
+    
+    controls = new OrbitControls(camera, renderer.domElement);
+}
+function createStars(particlesCount){
+    // Geometry
+    starFieldGeometry = new THREE.BufferGeometry;
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.z = 3.5;
+    posArray = new Float32Array(particlesCount * 3)
 
-const renderer = new THREE.WebGLRenderer( { antialias: true } );
-renderer.setPixelRatio( window.devicePixelRatio );
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.toneMapping = THREE.ReinhardToneMapping;
-document.body.appendChild(renderer.domElement);
-
-const controls = new OrbitControls(camera, renderer.domElement);
-
-// Geometry
-const starFieldGeometry = new THREE.BufferGeometry;
-const particlesCount = 5000;
-
-const posArray = new Float32Array(particlesCount * 3)
-
-for(let i = 0; i < particlesCount * 3; i++) {
+    for(let i = 0; i < particlesCount * 3; i++) {
     posArray[i] = (Math.random() - 0.5) * 10
+    }
+
+    // Materials
+    starFieldGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3))
+    starFieldMaterial = new THREE.PointsMaterial({
+        size: 0.005,
+    })
+
+    // Mesh
+    starFieldMesh = new THREE.Points(starFieldGeometry, starFieldMaterial);
+
+    return starFieldMesh;
 }
 
-// Materials
-starFieldGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3))
-const starFieldMaterial = new THREE.PointsMaterial({
-    size: 0.005,
-})
+setupScene();
+const starMesh = createStars(5000);
+scene.add(starMesh);
 
-// Geometry
-const starFieldMesh = new THREE.Points(starFieldGeometry, starFieldMaterial);
-scene.add(starFieldMesh);
+// Create Stats [DEV]
+//const stats = Stats();
+//document.body.appendChild(stats.dom);
 
+// Window resizing event
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -110,7 +127,6 @@ window.addEventListener('resize', () => {
 }, false);
 
 // Lights
-
 const pointLight = new THREE.PointLight( 0xffffff, 1);
 camera.add( pointLight );
 
@@ -119,10 +135,6 @@ ambientLight.position.x = 0;
 ambientLight.position.y = 0;
 ambientLight.position.z = 3;
 scene.add( ambientLight ); 
-
-// Stats
-const stats = Stats();
-document.body.appendChild(stats.dom);
 
 // Post Processing
 const renderScene = new RenderPass( scene, camera );
@@ -141,6 +153,7 @@ composer.addPass( bloomPass );
 const clock = new THREE.Clock();
 clock.autoStart = false;
 
+// Animation
 var animate = function () {
     requestAnimationFrame(animate);
 
@@ -154,27 +167,27 @@ var animate = function () {
         value.scale.y = audioData[index] + 85 * 1;
     })
 
-    // Bloom Bass Effect
-    if (audioData[0] > -20 && bloomPass.strength < 5) {
+    // Bass Effects
+    if (audioData[0] > -25 && bloomPass.strength < 5) {
         bloomPass.strength += bloomPass.strength * (audioData[0] * -0.01);
-        //camera.fov -= 0.5; OLD
         camera.fov -= (audioData[0] * -0.05)
         camera.updateProjectionMatrix();
-        starFieldMesh.rotation.y -= (audioData[0] * -0.001);
+        starFieldMesh.rotation.y += (audioData[0] * -0.0001);
     }
     if (audioData[0] < -19 && bloomPass.strength > 1.3) {
         bloomPass.strength -= bloomPass.strength * (audioData[0] * -0.0015);
         if(camera.fov < 75){
-            //camera.fov += 0.25; OLD
             camera.fov += (audioData[0] * -0.025)
             camera.updateProjectionMatrix();
         }
     }
 
+    // Updates
     controls.update();
     composer.render();
-    //render();
-    stats.update();
+
+    // Stats
+    //stats.update();
 };
 
 function render() {
