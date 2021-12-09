@@ -38,7 +38,7 @@ function createAudio(){
 
     // load a sound and set it as the Audio object's buffer
     audioLoader = new THREE.AudioLoader();
-    audioLoader.load( 'sounds/enjoy-yourself.mp3', function( buffer ) {
+    audioLoader.load( 'sounds/toosieslide.mp3', function( buffer ) {
         sound.setBuffer( buffer );
         sound.setLoop( true );
         sound.setVolume( 0.6 );
